@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wedding Planner</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'wedding-gold': '#D4AF37',
+                        'wedding-rose': '#E6BEAE',
+                        'wedding-sage': '#B2AC88',
+                        'wedding-dark': '#2C3E50',
+                        'wedding-light': '#F9F7F2',
+                    },
+                    fontFamily: {
+                        serif: ['"Playfair Display"', 'serif'],
+                        sans: ['"Lato"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #F9F7F2; }
+        .active-tab { 
+            background-color: #E6BEAE; 
+            color: #2C3E50;
+            font-weight: bold;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #D4AF37; border-radius: 4px; }
+        
+        .modal {
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0;
+            pointer-events: none;
+        }
+        .modal.modal-active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #D4AF37;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="font-sans text-wedding-dark antialiased h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <!-- Mobile Header -->
+    <div class="md:hidden bg-white p-4 shadow-md flex justify-between items-center z-20">
+        <h1 class="font-serif text-xl font-bold text-wedding-gold">Wedding Planner</h1>
+        <button id="mobile-menu-btn" class="text-wedding-dark focus:outline-none">
+            <i class="fas fa-bars fa-lg"></i>
+        </button>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="bg-white w-full md:w-64 h-full shadow-lg transform -translate-x-full md:translate-x-0 transition-transform duration-300 absolute md:relative z-30 flex flex-col">
+        <div class="p-6 text-center border-b border-gray-100 hidden md:block">
+            <i class="fas fa-rings-wedding text-4xl text-wedding-gold mb-2"></i>
+            <h1 class="font-serif text-2xl font-bold text-wedding-dark">Our Wedding</h1>
+            <p class="text-xs text-gray-500 mt-1">Planner App</p>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1 px-3">
+                <li>
+                    <button onclick="switchTab('dashboard')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-wedding-light transition flex items-center group active-tab" data-target="dashboard">
+                        <i class="fas fa-home w-8 text-center group-hover:text-wedding-gold"></i> Dashboard
+                    </button>
+                </li>
+                <li>
+                    <button onclick="switchTab('budget')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-wedding-light transition flex items-center group" data-target="budget">
+                        <i class="fas fa-wallet w-8 text-center group-hover:text-wedding-gold"></i> Anggaran
+                    </button>
+                </li>
+                <li>
+                    <button onclick="switchTab('vendors')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-wedding-light transition flex items-center group" data-target="vendors">
+                        <i class="fas fa-store w-8 text-center group-hover:text-wedding-gold"></i> Vendor
+                    </button>
+                </li>
+                <li>
+                    <button onclick="switchTab('guests')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-wedding-light transition flex items-center group" data-target="guests">
+                        <i class="fas fa-users w-8 text-center group-hover:text-wedding-gold"></i> Tamu Undangan
+                    </button>
+                </li>
+                <li>
+                    <button onclick="switchTab('timeline')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-wedding-light transition flex items-center group" data-target="timeline">
+                        <i class="fas fa-calendar-alt w-8 text-center group-hover:text-wedding-gold"></i> Timeline
+                    </button>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="p-4 border-t border-gray-100">
+            <div class="text-xs text-gray-400 text-center">User ID: <span id="user-display" class="font-mono">...</span></div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 h-full overflow-y-auto bg-wedding-light relative p-4 md:p-8" id="main-content">
+        
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
+            <div class="loading-spinner mb-4"></div>
+            <p class="text-wedding-dark font-serif">Memuat data pernikahan...</p>
+        </div>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="tab-content block">
+            <header class="mb-8">
+                <h2 class="text-3xl font-serif font-bold text-wedding-dark">Selamat Datang</h2>
+                <p class="text-gray-600">Ringkasan persiapan pernikahan Anda.</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Card 1 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-wedding-gold">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Tamu</p>
+                            <h3 class="text-2xl font-bold mt-1" id="dash-guest-count">0</h3>
+                        </div>
+                        <div class="bg-wedding-light p-2 rounded-lg text-wedding-gold"><i class="fas fa-users"></i></div>
+                    </div>
+                </div>
+                <!-- Card 2 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-wedding-sage">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Anggaran Terpakai</p>
+                            <h3 class="text-2xl font-bold mt-1" id="dash-budget-spent">Rp 0</h3>
+                        </div>
+                        <div class="bg-wedding-light p-2 rounded-lg text-wedding-sage"><i class="fas fa-money-bill-wave"></i></div>
+                    </div>
+                </div>
+                <!-- Card 3 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-400">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Vendor Lunas</p>
+                            <h3 class="text-2xl font-bold mt-1" id="dash-vendor-paid">0/0</h3>
+                        </div>
+                        <div class="bg-blue-50 p-2 rounded-lg text-blue-400"><i class="fas fa-check-circle"></i></div>
+                    </div>
+                </div>
+                <!-- Card 4 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border-l-4 border-wedding-rose">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Tugas Selesai</p>
+                            <h3 class="text-2xl font-bold mt-1" id="dash-tasks-done">0%</h3>
+                        </div>
+                        <div class="bg-red-50 p-2 rounded-lg text-wedding-rose"><i class="fas fa-tasks"></i></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-sm p-6">
+                <h3 class="font-serif font-bold text-lg mb-4">Pengingat Penting</h3>
+                <div class="p-4 bg-yellow-50 text-yellow-800 rounded-lg border border-yellow-200">
+                    <i class="fas fa-info-circle mr-2"></i> Pastikan untuk selalu mencatat setiap pengeluaran kecil agar anggaran tetap terkontrol.
+                </div>
+            </div>
+        </section>
+
+        <!-- Budget Section -->
+        <section id="budget-section" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-serif font-bold">Manajemen Anggaran</h2>
+                    <p class="text-sm text-gray-500">Pantau setiap sen biaya pernikahan.</p>
+                </div>
+                <button onclick="openModal('budget-modal')" class="bg-wedding-gold hover:bg-yellow-600 text-white px-4 py-2 rounded-lg shadow transition">
+                    <i class="fas fa-plus mr-2"></i> Tambah Item
+                </button>
+            </div>
+
+            <!-- Summary Budget -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white p-4 rounded-lg shadow-sm">
+                    <p class="text-xs text-gray-500">Total Estimasi</p>
+                    <p class="text-xl font-bold text-gray-700" id="budget-total-est">Rp 0</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-sm">
+                    <p class="text-xs text-gray-500">Total Aktual</p>
+                    <p class="text-xl font-bold text-red-500" id="budget-total-act">Rp 0</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-sm">
+                    <p class="text-xs text-gray-500">Sisa / Selisih</p>
+                    <p class="text-xl font-bold text-green-600" id="budget-diff">Rp 0</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
+                            <tr>
+                                <th class="p-4 font-semibold">Kategori</th>
+                                <th class="p-4 font-semibold">Item</th>
+                                <th class="p-4 font-semibold text-right">Estimasi</th>
+                                <th class="p-4 font-semibold text-right">Aktual</th>
+                                <th class="p-4 font-semibold text-right">Selisih</th>
+                                <th class="p-4 font-semibold text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="budget-list" class="divide-y divide-gray-100 text-sm">
+                            <!-- Items rendered via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="budget-empty" class="p-8 text-center text-gray-400 hidden">
+                    <i class="fas fa-wallet text-4xl mb-3 opacity-30"></i>
+                    <p>Belum ada data anggaran.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vendors Section -->
+        <section id="vendors-section" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-serif font-bold">Vendor Pernikahan</h2>
+                    <p class="text-sm text-gray-500">Kelola kontak dan pembayaran vendor.</p>
+                </div>
+                <button onclick="openModal('vendor-modal')" class="bg-wedding-sage hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow transition">
+                    <i class="fas fa-plus mr-2"></i> Tambah Vendor
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="vendor-list">
+                <!-- Vendor Cards rendered via JS -->
+            </div>
+            <div id="vendor-empty" class="p-12 text-center text-gray-400 hidden w-full">
+                <i class="fas fa-store text-4xl mb-3 opacity-30"></i>
+                <p>Belum ada vendor ditambahkan.</p>
+            </div>
+        </section>
+
+        <!-- Guests Section -->
+        <section id="guests-section" class="tab-content hidden">
+             <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                <div>
+                    <h2 class="text-2xl font-serif font-bold">Tamu Undangan</h2>
+                    <p class="text-sm text-gray-500">Digital, Cetak, dan Konfirmasi Kehadiran.</p>
+                </div>
+                <div class="flex gap-2">
+                     <div class="bg-white px-3 py-1 rounded shadow-sm text-sm border flex items-center">
+                        <span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span> Digital
+                    </div>
+                     <div class="bg-white px-3 py-1 rounded shadow-sm text-sm border flex items-center">
+                        <span class="w-2 h-2 rounded-full bg-orange-500 mr-2"></span> Cetak
+                    </div>
+                    <button onclick="openModal('guest-modal')" class="bg-wedding-rose hover:bg-pink-400 text-white px-4 py-2 rounded-lg shadow transition">
+                        <i class="fas fa-user-plus mr-2"></i> Tambah Tamu
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between text-sm">
+                    <span class="font-bold text-gray-600" id="total-pax-count">Total Pax: 0</span>
+                    <span class="font-bold text-green-600" id="total-present-count">Hadir: 0</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-white text-gray-600 text-xs uppercase border-b border-gray-100">
+                            <tr>
+                                <th class="p-4 font-semibold">Nama Tamu</th>
+                                <th class="p-4 font-semibold">Tipe</th>
+                                <th class="p-4 font-semibold text-center">Jml Pax</th>
+                                <th class="p-4 font-semibold text-center">Status</th>
+                                <th class="p-4 font-semibold text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="guest-list" class="divide-y divide-gray-100 text-sm">
+                            <!-- JS Rendered -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="guest-empty" class="p-8 text-center text-gray-400 hidden">
+                    <i class="fas fa-envelope-open-text text-4xl mb-3 opacity-30"></i>
+                    <p>Daftar tamu masih kosong.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Timeline Section -->
+        <section id="timeline-section" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-serif font-bold">Timeline & To-Do</h2>
+                    <p class="text-sm text-gray-500">Jadwal persiapan menuju hari H.</p>
+                </div>
+                <button onclick="openModal('timeline-modal')" class="bg-wedding-dark hover:bg-gray-800 text-white px-4 py-2 rounded-lg shadow transition">
+                    <i class="fas fa-plus mr-2"></i> Tambah Tugas
+                </button>
+            </div>
+
+            <div class="relative border-l-2 border-gray-200 ml-3 space-y-8 pb-8" id="timeline-list">
+                <!-- Timeline items rendered via JS -->
+            </div>
+            <div id="timeline-empty" class="p-12 text-center text-gray-400 hidden">
+                <i class="fas fa-calendar-check text-4xl mb-3 opacity-30"></i>
+                <p>Belum ada jadwal tugas.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODALS -->
+
+    <!-- Add Budget Modal -->
+    <div id="budget-modal" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="bg-wedding-gold p-4 flex justify-between items-center text-white">
+                <h3 class="font-bold">Tambah Anggaran</h3>
+                <button onclick="closeModal('budget-modal')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="budget-form" class="p-6 space-y-4">
+                <input type="hidden" id="budget-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Kategori</label>
+                    <select id="budget-category" class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-wedding-gold focus:border-wedding-gold">
+                        <option value="Venue & Katering">Venue & Katering</option>
+                        <option value="Dekorasi">Dekorasi</option>
+                        <option value="Busana & Makeup">Busana & Makeup</option>
+                        <option value="Dokumentasi">Dokumentasi</option>
+                        <option value="Hiburan">Hiburan</option>
+                        <option value="Lainnya">Lainnya</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nama Item</label>
+                    <input type="text" id="budget-item" required class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-wedding-gold focus:border-wedding-gold" placeholder="Contoh: Sewa Gedung">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Estimasi (Rp)</label>
+                        <input type="number" id="budget-est" required class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-wedding-gold focus:border-wedding-gold">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Aktual (Rp)</label>
+                        <input type="number" id="budget-act" value="0" class="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-wedding-gold focus:border-wedding-gold">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-wedding-dark text-white py-2 rounded-md hover:bg-gray-800 transition">Simpan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Vendor Modal -->
+    <div id="vendor-modal" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="bg-wedding-sage p-4 flex justify-between items-center text-white">
+                <h3 class="font-bold">Tambah Vendor</h3>
+                <button onclick="closeModal('vendor-modal')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="vendor-form" class="p-6 space-y-4">
+                <input type="hidden" id="vendor-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nama Vendor</label>
+                    <input type="text" id="vendor-name" required class="mt-1 w-full border border-gray-300 rounded-md p-2" placeholder="Nama Bisnis/Orang">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Layanan</label>
+                    <input type="text" id="vendor-service" required class="mt-1 w-full border border-gray-300 rounded-md p-2" placeholder="Contoh: Fotografer">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Kontak (HP/WA)</label>
+                    <input type="text" id="vendor-contact" class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Status Pembayaran</label>
+                    <select id="vendor-status" class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                        <option value="Belum Bayar">Belum Bayar</option>
+                        <option value="Down Payment (DP)">Down Payment (DP)</option>
+                        <option value="Lunas">Lunas</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-wedding-dark text-white py-2 rounded-md hover:bg-gray-800 transition">Simpan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Guest Modal -->
+    <div id="guest-modal" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="bg-wedding-rose p-4 flex justify-between items-center text-white">
+                <h3 class="font-bold">Tambah Tamu</h3>
+                <button onclick="closeModal('guest-modal')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="guest-form" class="p-6 space-y-4">
+                <input type="hidden" id="guest-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nama Tamu</label>
+                    <input type="text" id="guest-name" required class="mt-1 w-full border border-gray-300 rounded-md p-2" placeholder="Nama Lengkap">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Tipe Undangan</label>
+                        <select id="guest-type" class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                            <option value="Digital">Digital</option>
+                            <option value="Cetak">Cetak (Fisik)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Jumlah Pax</label>
+                        <input type="number" id="guest-pax" value="1" min="1" class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Konfirmasi Kehadiran</label>
+                    <select id="guest-status" class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                        <option value="Pending">Menunggu Konfirmasi</option>
+                        <option value="Hadir">Hadir</option>
+                        <option value="Tidak Hadir">Tidak Hadir</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-wedding-dark text-white py-2 rounded-md hover:bg-gray-800 transition">Simpan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Timeline Modal -->
+    <div id="timeline-modal" class="modal fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="bg-wedding-dark p-4 flex justify-between items-center text-white">
+                <h3 class="font-bold">Tambah Jadwal</h3>
+                <button onclick="closeModal('timeline-modal')" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="timeline-form" class="p-6 space-y-4">
+                <input type="hidden" id="timeline-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nama Tugas / Acara</label>
+                    <input type="text" id="timeline-task" required class="mt-1 w-full border border-gray-300 rounded-md p-2" placeholder="Contoh: Fitting Baju">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Tanggal Deadline</label>
+                    <input type="date" id="timeline-date" required class="mt-1 w-full border border-gray-300 rounded-md p-2">
+                </div>
+                 <div>
+                    <label class="flex items-center space-x-2 mt-2">
+                        <input type="checkbox" id="timeline-done" class="rounded text-wedding-gold focus:ring-wedding-gold">
+                        <span class="text-sm text-gray-700">Sudah Selesai?</span>
+                    </label>
+                </div>
+                <button type="submit" class="w-full bg-wedding-gold text-white py-2 rounded-md hover:bg-yellow-600 transition">Simpan</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <span id="toast-message">Notification</span>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // --- Configuration ---
+
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyACQvxSunANUXpd9cx-f1j2uwrOgnfmROo",
+    authDomain: "mywedding-9447e.firebaseapp.com",
+    projectId: "mywedding-9447e",
+    storageBucket: "mywedding-9447e.firebasestorage.app",
+    messagingSenderId: "239678762718",
+    appId: "1:239678762718:web:2880e24b12169ed21d9c4f"
+  };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'wedding-planner';
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUser = null;
+
+        // --- Authentication ---
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth Error:", error);
+                showToast("Gagal login: " + error.message);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('user-display').textContent = user.uid.substring(0, 8);
+                document.getElementById('loading-overlay').classList.add('hidden');
+                
+                // Initialize Listeners
+                initListeners();
+            } else {
+                currentUser = null;
+                document.getElementById('loading-overlay').classList.remove('hidden');
+            }
+        });
+
+        initAuth();
+
+        // --- Data Listeners (Real-time) ---
+        function initListeners() {
+            if(!currentUser) return;
+            const uid = currentUser.uid;
+
+            // 1. Budget Listener
+            const budgetRef = collection(db, 'artifacts', appId, 'users', uid, 'budgets');
+            onSnapshot(budgetRef, (snapshot) => {
+                const budgets = [];
+                let totalEst = 0;
+                let totalAct = 0;
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    budgets.push({id: doc.id, ...data});
+                    totalEst += Number(data.estimate || 0);
+                    totalAct += Number(data.actual || 0);
+                });
+                renderBudget(budgets);
+                updateBudgetSummary(totalEst, totalAct);
+            }, (error) => console.error("Budget Error", error));
+
+            // 2. Vendor Listener
+            const vendorRef = collection(db, 'artifacts', appId, 'users', uid, 'vendors');
+            onSnapshot(vendorRef, (snapshot) => {
+                const vendors = [];
+                let paidCount = 0;
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    vendors.push({id: doc.id, ...data});
+                    if(data.status === 'Lunas') paidCount++;
+                });
+                renderVendors(vendors);
+                document.getElementById('dash-vendor-paid').textContent = `${paidCount}/${vendors.length}`;
+            }, (error) => console.error("Vendor Error", error));
+
+            // 3. Guest Listener
+            const guestRef = collection(db, 'artifacts', appId, 'users', uid, 'guests');
+            onSnapshot(guestRef, (snapshot) => {
+                const guests = [];
+                let totalPax = 0;
+                let presentPax = 0;
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    guests.push({id: doc.id, ...data});
+                    totalPax += Number(data.pax || 0);
+                    if(data.status === 'Hadir') presentPax += Number(data.pax || 0);
+                });
+                renderGuests(guests);
+                document.getElementById('dash-guest-count').textContent = totalPax;
+                document.getElementById('total-pax-count').textContent = `Total Pax: ${totalPax}`;
+                document.getElementById('total-present-count').textContent = `Hadir: ${presentPax}`;
+            }, (error) => console.error("Guest Error", error));
+
+            // 4. Timeline Listener
+            const timelineRef = collection(db, 'artifacts', appId, 'users', uid, 'timeline');
+            onSnapshot(timelineRef, (snapshot) => {
+                const tasks = [];
+                let doneCount = 0;
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    tasks.push({id: doc.id, ...data});
+                    if(data.done) doneCount++;
+                });
+                
+                // Sort locally by date (Rule 2 compliancy)
+                tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
+                
+                renderTimeline(tasks);
+                const percent = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
+                document.getElementById('dash-tasks-done').textContent = `${percent}%`;
+            }, (error) => console.error("Timeline Error", error));
+        }
+
+        // --- Render Functions ---
+
+        const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+
+        function updateBudgetSummary(est, act) {
+            document.getElementById('budget-total-est').textContent = formatRupiah(est);
+            document.getElementById('budget-total-act').textContent = formatRupiah(act);
+            document.getElementById('dash-budget-spent').textContent = formatRupiah(act);
+            
+            const diff = est - act;
+            const diffEl = document.getElementById('budget-diff');
+            diffEl.textContent = formatRupiah(diff);
+            if(diff < 0) {
+                diffEl.classList.remove('text-green-600');
+                diffEl.classList.add('text-red-500');
+            } else {
+                diffEl.classList.remove('text-red-500');
+                diffEl.classList.add('text-green-600');
+            }
+        }
+
+        function renderBudget(items) {
+            const tbody = document.getElementById('budget-list');
+            const emptyState = document.getElementById('budget-empty');
+            tbody.innerHTML = '';
+            
+            if(items.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 group";
+                const diff = item.estimate - item.actual;
+                const diffClass = diff >= 0 ? "text-green-600" : "text-red-500";
+                
+                tr.innerHTML = `
+                    <td class="p-4"><span class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">${item.category}</span></td>
+                    <td class="p-4 font-medium">${item.item}</td>
+                    <td class="p-4 text-right text-gray-500">${formatRupiah(item.estimate)}</td>
+                    <td class="p-4 text-right font-medium">${formatRupiah(item.actual)}</td>
+                    <td class="p-4 text-right font-bold ${diffClass}">${formatRupiah(diff)}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="window.deleteItem('budgets', '${item.id}')" class="text-gray-400 hover:text-red-500 transition"><i class="fas fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderVendors(vendors) {
+            const container = document.getElementById('vendor-list');
+            const emptyState = document.getElementById('vendor-empty');
+            container.innerHTML = '';
+
+            if(vendors.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            vendors.forEach(v => {
+                const statusColor = v.status === 'Lunas' ? 'bg-blue-100 text-blue-600' : (v.status === 'Down Payment (DP)' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600');
+                
+                const card = document.createElement('div');
+                card.className = "bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition relative";
+                card.innerHTML = `
+                    <button onclick="window.deleteItem('vendors', '${v.id}')" class="absolute top-4 right-4 text-gray-300 hover:text-red-400"><i class="fas fa-times"></i></button>
+                    <div class="flex items-center mb-3">
+                        <div class="w-10 h-10 rounded-full bg-wedding-light flex items-center justify-center text-wedding-gold mr-3">
+                            <i class="fas fa-store"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg">${v.name}</h4>
+                            <p class="text-xs text-gray-500">${v.service}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm text-gray-600">
+                        <div class="flex items-center">
+                            <i class="fas fa-phone w-6 text-center text-gray-400"></i> ${v.contact || '-'}
+                        </div>
+                        <div class="flex items-center mt-2">
+                             <span class="px-3 py-1 rounded-full text-xs font-bold ${statusColor}">${v.status}</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderGuests(guests) {
+            const tbody = document.getElementById('guest-list');
+            const emptyState = document.getElementById('guest-empty');
+            tbody.innerHTML = '';
+
+            if(guests.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            guests.forEach(g => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50";
+                
+                const typeBadge = g.type === 'Digital' 
+                    ? '<span class="text-blue-500 bg-blue-50 px-2 py-1 rounded text-xs">Digital</span>' 
+                    : '<span class="text-orange-500 bg-orange-50 px-2 py-1 rounded text-xs">Cetak</span>';
+
+                let statusIcon = '';
+                if(g.status === 'Hadir') statusIcon = '<i class="fas fa-check-circle text-green-500"></i>';
+                else if(g.status === 'Tidak Hadir') statusIcon = '<i class="fas fa-times-circle text-red-500"></i>';
+                else statusIcon = '<i class="fas fa-question-circle text-gray-300"></i>';
+
+                tr.innerHTML = `
+                    <td class="p-4 font-medium">${g.name}</td>
+                    <td class="p-4">${typeBadge}</td>
+                    <td class="p-4 text-center font-bold text-gray-600">${g.pax}</td>
+                    <td class="p-4 text-center text-lg">${statusIcon}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="window.deleteItem('guests', '${g.id}')" class="text-gray-400 hover:text-red-500 transition"><i class="fas fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderTimeline(tasks) {
+            const container = document.getElementById('timeline-list');
+            const emptyState = document.getElementById('timeline-empty');
+            container.innerHTML = '';
+
+            if(tasks.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            tasks.forEach(t => {
+                const div = document.createElement('div');
+                div.className = "relative pl-6 transition-all duration-300";
+                
+                const circleColor = t.done ? "bg-green-500" : "bg-gray-300";
+                const textColor = t.done ? "text-gray-400 line-through" : "text-gray-800";
+                const dateColor = t.done ? "text-gray-400" : "text-wedding-gold";
+
+                div.innerHTML = `
+                    <div class="absolute -left-2 top-1 w-4 h-4 rounded-full ${circleColor} border-2 border-white"></div>
+                    <div class="flex justify-between items-start bg-white p-3 rounded-lg shadow-sm">
+                        <div class="flex-1 cursor-pointer" onclick="window.toggleTimeline('${t.id}', ${!t.done})">
+                            <p class="text-sm font-bold ${dateColor} mb-1">${t.date}</p>
+                            <h4 class="${textColor} font-medium">${t.task}</h4>
+                        </div>
+                        <button onclick="window.deleteItem('timeline', '${t.id}')" class="ml-2 text-gray-300 hover:text-red-400"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- CRUD Operations (Window Exposed) ---
+
+        window.deleteItem = async (colName, id) => {
+            if(!confirm("Yakin ingin menghapus item ini?")) return;
+            if(!currentUser) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, colName, id));
+                showToast("Item berhasil dihapus");
+            } catch (e) {
+                showToast("Gagal menghapus: " + e.message);
+            }
+        };
+
+        window.toggleTimeline = async (id, newStatus) => {
+            if(!currentUser) return;
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'timeline', id), {
+                    done: newStatus
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        // --- Form Handlers ---
+
+        document.getElementById('budget-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                category: document.getElementById('budget-category').value,
+                item: document.getElementById('budget-item').value,
+                estimate: Number(document.getElementById('budget-est').value),
+                actual: Number(document.getElementById('budget-act').value)
+            };
+            await addItem('budgets', data, 'budget-modal', 'budget-form');
+        });
+
+        document.getElementById('vendor-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('vendor-name').value,
+                service: document.getElementById('vendor-service').value,
+                contact: document.getElementById('vendor-contact').value,
+                status: document.getElementById('vendor-status').value
+            };
+            await addItem('vendors', data, 'vendor-modal', 'vendor-form');
+        });
+
+        document.getElementById('guest-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('guest-name').value,
+                type: document.getElementById('guest-type').value,
+                pax: Number(document.getElementById('guest-pax').value),
+                status: document.getElementById('guest-status').value
+            };
+            await addItem('guests', data, 'guest-modal', 'guest-form');
+        });
+
+        document.getElementById('timeline-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                task: document.getElementById('timeline-task').value,
+                date: document.getElementById('timeline-date').value,
+                done: document.getElementById('timeline-done').checked
+            };
+            await addItem('timeline', data, 'timeline-modal', 'timeline-form');
+        });
+
+        async function addItem(colName, data, modalId, formId) {
+            if(!currentUser) {
+                showToast("Anda harus login/terkoneksi.");
+                return;
+            }
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'users', currentUser.uid, colName), data);
+                showToast("Data berhasil disimpan!");
+                closeModal(modalId);
+                document.getElementById(formId).reset();
+            } catch (e) {
+                showToast("Error: " + e.message);
+            }
+        }
+
+        // --- UI Helper Functions ---
+
+        window.showToast = (msg) => {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            t.classList.remove('opacity-0', 'translate-y-20');
+            setTimeout(() => {
+                t.classList.add('opacity-0', 'translate-y-20');
+            }, 3000);
+        };
+
+        window.switchTab = (tabId) => {
+            // Hide all sections
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            // Show target
+            document.getElementById(`${tabId}-section`).classList.remove('hidden');
+            
+            // Update sidebar active state
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active-tab', 'bg-wedding-light'));
+            const activeBtn = document.querySelector(`button[data-target="${tabId}"]`);
+            if(activeBtn) {
+                activeBtn.classList.add('active-tab');
+            }
+
+            // Close mobile menu if open
+            if(window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+            }
+        };
+
+        window.openModal = (id) => {
+            document.getElementById(id).classList.add('modal-active');
+        };
+
+        window.closeModal = (id) => {
+            document.getElementById(id).classList.remove('modal-active');
+        };
+
+        // Mobile Menu Toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+            const sidebar = document.getElementById('sidebar');
+            if(sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.remove('-translate-x-full');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+            }
+        });
+
+    </script>
+</body>
+</html>
