@@ -60,6 +60,21 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Animation for status indicator */
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #10B981;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
     </style>
 </head>
 <body class="font-sans text-wedding-dark antialiased h-screen flex flex-col md:flex-row overflow-hidden">
@@ -110,7 +125,12 @@
             </ul>
         </div>
         
-        <div class="p-4 border-t border-gray-100">
+        <div class="p-4 border-t border-gray-100 bg-gray-50">
+            <!-- Connection Status -->
+            <div class="flex items-center justify-center mb-2 bg-white px-2 py-1 rounded-full border border-gray-200 shadow-sm w-max mx-auto">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-400 mr-2"></div>
+                <span id="status-text" class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Offline</span>
+            </div>
             <div class="text-xs text-gray-400 text-center">User ID: <span id="user-display" class="font-mono">...</span></div>
         </div>
     </nav>
@@ -121,7 +141,7 @@
         <!-- Loading Overlay -->
         <div id="loading-overlay" class="absolute inset-0 bg-white/80 z-50 flex flex-col items-center justify-center">
             <div class="loading-spinner mb-4"></div>
-            <p class="text-wedding-dark font-serif">Memuat data pernikahan...</p>
+            <p class="text-wedding-dark font-serif">Menghubungkan ke Database...</p>
         </div>
 
         <!-- Dashboard Section -->
@@ -479,8 +499,14 @@
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // --- Configuration ---
-        const firebaseConfig = {
+        // ==========================================
+        // KONFIGURASI FIREBASE
+        // ==========================================
+        
+        // 1. JIKA ANDA MENGGUNAKAN FILE INI DI LOCALHOST / HOSTING SENDIRI:
+        //    Silakan isi 'manualConfig' di bawah ini dengan data dari Firebase Console Anda.
+        //    (Project Settings > General > Your apps > SDK setup and configuration > Config)
+        const manualConfig = {
           apiKey: "AIzaSyACQvxSunANUXpd9cx-f1j2uwrOgnfmROo",
           authDomain: "mywedding-9447e.firebaseapp.com",
           projectId: "mywedding-9447e",
@@ -488,17 +514,39 @@
           messagingSenderId: "239678762718",
           appId: "1:239678762718:web:2880e24b12169ed21d9c4f"
         };
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'wedding-planner';
-        
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
 
+        // 2. Logika Pemilihan Config (Jangan diubah)
+        //    Ini otomatis memilih antara config sistem (jika di preview) atau config manual Anda.
+        const systemConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const firebaseConfig = (systemConfig && systemConfig.apiKey) ? systemConfig : manualConfig;
+        
+        // 3. App ID Unik (Jangan diubah kecuali paham)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'wedding-planner';
+
+        // ==========================================
+        
+        // Inisialisasi
+        let app, db, auth;
         let currentUser = null;
 
+        // Cek apakah config valid
+        if (!firebaseConfig.apiKey) {
+            document.getElementById('loading-overlay').innerHTML = `
+                <div class="text-center p-8 max-w-md">
+                    <i class="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-4"></i>
+                    <h3 class="text-xl font-bold mb-2">Firebase Belum Dikonfigurasi</h3>
+                    <p class="text-sm text-gray-600 mb-4">Untuk menyimpan data, Anda perlu mengisi bagian <code>manualConfig</code> di dalam kode dengan API Key dari Firebase Console.</p>
+                </div>
+            `;
+        } else {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            initAuth();
+        }
+
         // --- Authentication ---
-        const initAuth = async () => {
+        async function initAuth() {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -508,24 +556,41 @@
             } catch (error) {
                 console.error("Auth Error:", error);
                 showToast("Gagal login: " + error.message);
+                updateStatus(false);
             }
         };
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                document.getElementById('user-display').textContent = user.uid.substring(0, 8);
-                document.getElementById('loading-overlay').classList.add('hidden');
-                
-                // Initialize Listeners
-                initListeners();
-            } else {
-                currentUser = null;
-                document.getElementById('loading-overlay').classList.remove('hidden');
-            }
-        });
+        if(auth) {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('user-display').textContent = user.uid.substring(0, 8);
+                    document.getElementById('loading-overlay').classList.add('hidden');
+                    updateStatus(true);
+                    
+                    // Initialize Listeners
+                    initListeners();
+                } else {
+                    currentUser = null;
+                    document.getElementById('loading-overlay').classList.remove('hidden');
+                    updateStatus(false);
+                }
+            });
+        }
 
-        initAuth();
+        function updateStatus(isOnline) {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            if(isOnline) {
+                dot.className = "w-2 h-2 rounded-full bg-green-500 mr-2 pulse-dot";
+                text.className = "text-[10px] font-bold text-green-600 uppercase tracking-wider";
+                text.textContent = "Terhubung";
+            } else {
+                dot.className = "w-2 h-2 rounded-full bg-gray-400 mr-2";
+                text.className = "text-[10px] font-bold text-gray-500 uppercase tracking-wider";
+                text.textContent = "Offline";
+            }
+        }
 
         // --- Data Listeners (Real-time) ---
         function initListeners() {
@@ -591,7 +656,7 @@
                     if(data.done) doneCount++;
                 });
                 
-                // Sort locally by date (Rule 2 compliancy)
+                // Sort locally by date
                 tasks.sort((a, b) => new Date(a.date) - new Date(b.date));
                 
                 renderTimeline(tasks);
@@ -833,7 +898,7 @@
 
         async function addItem(colName, data, modalId, formId) {
             if(!currentUser) {
-                showToast("Anda harus login/terkoneksi.");
+                showToast("Anda belum terkoneksi ke Firebase.");
                 return;
             }
             try {
@@ -842,7 +907,7 @@
                 closeModal(modalId);
                 document.getElementById(formId).reset();
             } catch (e) {
-                showToast("Error: " + e.message);
+                showToast("Error Simpan: " + e.message);
             }
         }
 
